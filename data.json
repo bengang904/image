@@ -4,6 +4,12 @@
         "type": "加密",
         "link": "web/1",
         "thumbnail": "web/1/logo.jpg"
+    },
+    {
+        "title": "图像编辑",
+        "type": "编辑",
+        "link": "web/2",
+        "thumbnail": "web/2/logo.jpg"
     }
 ]
 
