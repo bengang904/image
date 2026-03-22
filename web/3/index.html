@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>人脸私钥生成</title>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <style>
+        :root { --neon: #00f2fe; --bg: #000; --panel: #0a0a0a; --border: #222; --text: #fff; --warn: #ff4444; --safe: #00ff41; }
+        * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0 !important; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .app-container { width: 100%; max-width: 450px; display: flex; flex-direction: column; gap: 12px; padding: 15px; }
+        .view-port { position: relative; width: 100%; aspect-ratio: 4/3; border: 1px solid var(--border); background: #050505; overflow: hidden; }
+        video { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+        .processing-mask { position: absolute; inset: 0; background: rgba(0, 242, 254, 0.15); display: none; z-index: 2; pointer-events: none; }
+        canvas#raw-canvas { position: absolute; z-index: 3; width: 100%; height: 100%; }
+        .guide-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 55%; height: 75%; border: 2px dashed rgba(255, 255, 255, 0.2); border-radius: 50% !important; z-index: 1; pointer-events: none; }
+        .status-box { text-align: center; padding: 15px; font-weight: 800; font-size: 14px; border: 1px solid var(--border); color: #555; text-transform: uppercase; letter-spacing: 2px; }
+        .status-box.active { border-color: var(--neon); color: var(--neon); }
+        .status-box.locked { border-color: var(--safe); color: var(--safe); background: rgba(0,255,65,0.05); }
+        .panel { background: var(--panel); border: 1px solid var(--border); padding: 12px; }
+        .ortho-preview { width: 100%; height: 100px; background: #000; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+        canvas#ortho-canvas { width: 100%; height: 100%; }
+        .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; font-family: monospace; font-size: 10px; color: #666; }
+        #key-box { background: #000; border: 1px dotted var(--safe); padding: 12px; font-family: monospace; font-size: 11px; color: var(--safe); word-break: break-all; margin-top: 10px; display: none; line-height: 1.5; }
+        .scan-line { position: absolute; width: 100%; height: 3px; background: var(--neon); top: 0; left: 0; z-index: 4; display: none; box-shadow: 0 0 15px var(--neon); }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <h2 style="font-size: 14px; letter-spacing: 4px; text-align: center; margin: 10px 0; color: #666;">生物加密节点</h2>
+
+        <div class="view-port">
+            <video id="video" autoplay muted playsinline></video>
+            <div class="guide-box" id="guide-box"></div>
+            <div id="processing-mask" class="processing-mask"></div>
+            <canvas id="raw-canvas"></canvas>
+            <div id="scan-line" class="scan-line"></div>
+        </div>
+
+        <div id="status-display" class="status-box">系统初始化...</div>
+
+        <div class="panel">
+            <div class="ortho-preview">
+                <canvas id="ortho-canvas" width="200" height="100"></canvas>
+            </div>
+            <div class="metrics">
+                <div>水平偏航: <b id="yaw-val">--</b></div>
+                <div>翻滚角度: <b id="tilt-val">--</b></div>
+                <div>缩放比例: <b id="scale-val">--</b></div>
+                <div>采样进度: <b id="progress-val">0%</b></div>
+            </div>
+            <div id="key-box"></div>
+            <button id="reset-btn" onclick="location.reload()" style="display:none; width:100%; background:none; border:1px solid #333; color:#555; padding:10px; margin-top:10px; font-size:10px; cursor:pointer;">重新身份验证</button>
+        </div>
+    </div>
+
+<script>
+    const video = document.getElementById('video');
+    const rawCanvas = document.getElementById('raw-canvas');
+    const orthoCanvas = document.getElementById('ortho-canvas');
+    const statusDisplay = document.getElementById('status-display');
+    const scanLine = document.getElementById('scan-line');
+    const mask = document.getElementById('processing-mask');
+    const guideBox = document.getElementById('guide-box');
+    const keyBox = document.getElementById('key-box');
+    const resetBtn = document.getElementById('reset-btn');
+    
+    const rawCtx = rawCanvas.getContext('2d');
+    const orthoCtx = orthoCanvas.getContext('2d');
+
+    let isLocked = false, isProcessing = false, samples = [];
+    const MAX_SAMPLES = 10; 
+
+    async function init() {
+        try {
+            const URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+            await faceapi.nets.tinyFaceDetector.loadFromUri(URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(URL);
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "user", width: 640, height: 480 } 
+            });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                rawCanvas.width = video.videoWidth;
+                rawCanvas.height = video.videoHeight;
+                loop();
+            };
+        } catch (e) {
+            statusDisplay.innerText = "硬件连接错误";
+        }
+    }
+
+    function loop() {
+        if (!isLocked) render();
+        requestAnimationFrame(loop);
+    }
+
+    async function render() {
+        const det = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+        rawCtx.clearRect(0, 0, rawCanvas.width, rawCanvas.height);
+        orthoCtx.clearRect(0, 0, orthoCanvas.width, orthoCanvas.height);
+
+        if (det) {
+            const pts = det.landmarks.positions;
+            const nose = pts[30], leftEye = pts[36], rightEye = pts[45];
+            const yaw = Math.abs(nose.x - leftEye.x) / Math.abs(nose.x - rightEye.x);
+            const isForward = yaw > 0.88 && yaw < 1.14; 
+            const angle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x);
+            const scale = 100 / Math.sqrt(Math.pow(rightEye.x-leftEye.x, 2) + Math.pow(rightEye.y-leftEye.y, 2));
+
+            document.getElementById('yaw-val').innerText = isForward ? "已锁定" : "偏离";
+            document.getElementById('tilt-val').innerText = (angle * 180 / Math.PI).toFixed(1) + "°";
+            document.getElementById('scale-val').innerText = scale.toFixed(2);
+
+            drawOrtho(pts, nose, angle, scale, isForward);
+
+            if (isForward) {
+                guideBox.style.borderColor = "var(--safe)";
+                if (!isProcessing) {
+                    isProcessing = true;
+                    mask.style.display = 'block';
+                    scanLine.style.display = 'block';
+                    runScanLine();
+                }
+                autoCapture(det.landmarks);
+            } else {
+                guideBox.style.borderColor = "var(--warn)";
+                if (isProcessing) resetState();
+                statusDisplay.innerText = "请将面部居中";
+                statusDisplay.className = "status-box active";
+            }
+        } else {
+            guideBox.style.borderColor = "rgba(255,255,255,0.2)";
+            if (isProcessing) resetState();
+            statusDisplay.innerText = "正在扫描...";
+            statusDisplay.className = "status-box";
+        }
+    }
+
+    function runScanLine() {
+        let pos = 0;
+        const anim = setInterval(() => {
+            if (!isProcessing || isLocked) { clearInterval(anim); scanLine.style.display = 'none'; return; }
+            pos = (pos + 4) % 100;
+            scanLine.style.top = pos + "%";
+        }, 30);
+    }
+
+    function drawOrtho(pts, nose, angle, scale, isForward) {
+        const cosA = Math.cos(-angle), sinA = Math.sin(-angle);
+        const corePoints = [27, 28, 29, 30, 33, 36, 39, 42, 45, 48, 54];
+        orthoCtx.save();
+        orthoCtx.translate(orthoCanvas.width/2, orthoCanvas.height/2);
+        orthoCtx.strokeStyle = isForward ? 'var(--neon)' : '#333';
+        orthoCtx.strokeRect(-25, -35, 50, 70);
+        corePoints.forEach(idx => {
+            const p = pts[idx];
+            const rx = (p.x - nose.x) * cosA - (p.y - nose.y) * sinA;
+            const ry = (p.x - nose.x) * sinA + (p.y - nose.y) * cosA;
+            orthoCtx.fillStyle = isForward ? 'var(--neon)' : '#333';
+            orthoCtx.beginPath();
+            orthoCtx.arc(rx * scale * 0.5, ry * scale * 0.5, 1.5, 0, Math.PI*2);
+            orthoCtx.fill();
+        });
+        orthoCtx.restore();
+    }
+
+    async function autoCapture(landmarks) {
+        statusDisplay.innerText = "提取特征中...";
+        statusDisplay.className = "status-box active";
+        
+        const pts = landmarks.positions;
+        const nose = pts[30], leftEye = pts[36], rightEye = pts[45];
+        const angle = Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x);
+        const scale = 100 / Math.sqrt(Math.pow(rightEye.x-leftEye.x, 2) + Math.pow(rightEye.y-leftEye.y, 2));
+        const cosA = Math.cos(-angle), sinA = Math.sin(-angle);
+        const corePoints = [27, 28, 29, 30, 33, 36, 39, 42, 45, 48, 54];
+        
+        const feature = corePoints.map(idx => {
+            const p = pts[idx];
+            const rx = (p.x - nose.x) * cosA - (p.y - nose.y) * sinA;
+            const ry = (p.x - nose.x) * sinA + (p.y - nose.y) * cosA;
+            return `${Math.round((rx * scale) / 45)},${Math.round((ry * scale) / 45)}`;
+        }).join('|');
+
+        samples.push(feature);
+        document.getElementById('progress-val').innerText = Math.round((samples.length / MAX_SAMPLES) * 100) + "%";
+        if (samples.length >= MAX_SAMPLES) finalize();
+    }
+
+    function resetState() {
+        isProcessing = false;
+        samples = [];
+        mask.style.display = 'none';
+        scanLine.style.display = 'none';
+        document.getElementById('progress-val').innerText = "0%";
+    }
+
+    async function finalize() {
+        isLocked = true;
+        isProcessing = false;
+        mask.style.display = 'none';
+        guideBox.style.display = "none";
+        const counts = {};
+        samples.forEach(s => counts[s] = (counts[s] || 0) + 1);
+        const winner = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
+        const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(winner));
+        const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        
+        statusDisplay.innerText = "私钥生成成功";
+        statusDisplay.className = "status-box locked";
+        keyBox.innerText = hex;
+        keyBox.style.display = 'block';
+        resetBtn.style.display = 'block';
+    }
+
+    init();
+</script>
+</body>
+</html>
