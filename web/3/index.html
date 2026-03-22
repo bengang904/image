@@ -11,88 +11,67 @@
         
         body { 
             font-family: system-ui, sans-serif; 
-            background: var(--bg); 
-            color: var(--text); 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            min-height: 100vh;
-            min-height: 100svh; 
-            overflow-x: hidden;
+            background: var(--bg); color: var(--text); 
+            display: flex; flex-direction: column; align-items: center; 
+            min-height: 100svh; overflow: hidden;
         }
 
         .app-container { 
-            width: 100%; 
-            max-width: 450px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 12px; 
-            padding: 15px;
-            flex: 1; 
+            width: 100%; max-width: 450px; 
+            display: flex; flex-direction: column; gap: 10px; padding: 15px;
+            height: 100svh;
         }
 
         .view-port { 
-            position: relative; 
-            width: 100%; 
-            aspect-ratio: 4 / 3; 
-            border: 1px solid var(--border); 
-            background: #050505; 
-            overflow: hidden; 
-            flex-shrink: 0; 
+            position: relative; width: 100%; aspect-ratio: 4 / 3; 
+            border: 1px solid var(--border); background: #050505; 
+            overflow: hidden; flex-shrink: 0;
         }
 
-        video { 
-            position: absolute; 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; 
-        }
-
+        video { position: absolute; width: 100%; height: 100%; object-fit: cover; }
         .processing-mask { position: absolute; inset: 0; background: rgba(0, 242, 254, 0.15); display: none; z-index: 2; pointer-events: none; }
         canvas#raw-canvas { position: absolute; z-index: 3; width: 100%; height: 100%; }
         
         .guide-box { 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%); 
-            width: 55%; 
-            height: 75%; 
-            border: 2px dashed rgba(255, 255, 255, 0.2); 
-            border-radius: 50% !important; 
-            z-index: 1; 
-            pointer-events: none; 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            width: 55%; height: 75%; border: 2px dashed rgba(255, 255, 255, 0.2); 
+            z-index: 1; pointer-events: none; border-radius: 50% !important;
         }
 
-        .status-box { text-align: center; padding: 15px; font-weight: 800; font-size: 14px; border: 1px solid var(--border); color: #555; text-transform: uppercase; letter-spacing: 2px; flex-shrink: 0; }
+        .status-box { text-align: center; padding: 12px; font-weight: 800; font-size: 13px; border: 1px solid var(--border); color: #555; letter-spacing: 2px; flex-shrink: 0; }
         .status-box.active { border-color: var(--neon); color: var(--neon); }
         .status-box.locked { border-color: var(--safe); color: var(--safe); background: rgba(0,255,65,0.05); }
 
         .panel { 
-            background: var(--panel); 
-            border: 1px solid var(--border); 
-            padding: 12px; 
-            flex-grow: 1; 
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            background: var(--panel); border: 1px solid var(--border); padding: 12px; 
+            flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto;
         }
 
-        .ortho-preview { width: 100%; height: 100px; background: #000; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .ortho-preview { width: 100%; height: 80px; background: #000; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         canvas#ortho-canvas { width: 100%; height: 100%; }
         
         .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; font-family: monospace; font-size: 10px; color: #666; }
-        #key-box { background: #000; border: 1px dotted var(--safe); padding: 12px; font-family: monospace; font-size: 11px; color: var(--safe); word-break: break-all; margin-top: 10px; display: none; line-height: 1.5; }
         
-        .scan-line { position: absolute; width: 100%; height: 3px; background: var(--neon); top: 0; left: 0; z-index: 4; display: none; box-shadow: 0 0 15px var(--neon); }
+        #result-area { display: none; margin-top: 10px; flex-direction: column; gap: 8px; }
+        #key-box { 
+            background: #000; border: 1px dotted var(--safe); padding: 10px; 
+            font-family: monospace; font-size: 11px; color: var(--safe); 
+            word-break: break-all; line-height: 1.4;
+        }
+        
+        .action-btn { 
+            width: 100%; background: none; border: 1px solid #333; color: #aaa; 
+            padding: 12px; font-size: 11px; cursor: pointer; text-transform: uppercase;
+        }
+        .copy-btn { border-color: var(--safe); color: var(--safe); }
 
-        #reset-btn { width: 100%; background: none; border: 1px solid #333; color: #555; padding: 10px; margin-top: 10px; font-size: 10px; cursor: pointer; }
+        .scan-line { position: absolute; width: 100%; height: 2px; background: var(--neon); top: 0; left: 0; z-index: 4; display: none; box-shadow: 0 0 10px var(--neon); }
     </style>
 </head>
 <body>
 
     <div class="app-container">
-        <h2 style="font-size: 12px; letter-spacing: 4px; text-align: center; margin: 10px 0; color: #444; flex-shrink: 0;">生物加密节点</h2>
+        <h2 style="font-size: 11px; letter-spacing: 3px; text-align: center; color: #444; flex-shrink: 0;">BIOMETRIC KEY NODE</h2>
 
         <div class="view-port">
             <video id="video" autoplay muted playsinline></video>
@@ -105,19 +84,21 @@
         <div id="status-display" class="status-box">系统初始化...</div>
 
         <div class="panel">
-            <div>
-                <div class="ortho-preview">
-                    <canvas id="ortho-canvas" width="200" height="100"></canvas>
-                </div>
-                <div class="metrics">
-                    <div>水平偏航: <b id="yaw-val">--</b></div>
-                    <div>翻滚角度: <b id="tilt-val">--</b></div>
-                    <div>缩放比例: <b id="scale-val">--</b></div>
-                    <div>采样进度: <b id="progress-val">0%</b></div>
-                </div>
+            <div class="ortho-preview">
+                <canvas id="ortho-canvas" width="200" height="80"></canvas>
             </div>
-            <div id="key-box"></div>
-            <button id="reset-btn" onclick="location.reload()" style="display:none;">重新身份验证</button>
+            <div class="metrics">
+                <div>水平偏航: <b id="yaw-val">--</b></div>
+                <div>翻滚角度: <b id="tilt-val">--</b></div>
+                <div>缩放比例: <b id="scale-val">--</b></div>
+                <div>采样进度: <b id="progress-val">0%</b></div>
+            </div>
+            
+            <div id="result-area">
+                <div id="key-box"></div>
+                <button class="action-btn copy-btn" id="copy-btn">复制私钥</button>
+                <button class="action-btn" onclick="location.reload()">重新验证</button>
+            </div>
         </div>
     </div>
 
@@ -130,7 +111,8 @@
     const mask = document.getElementById('processing-mask');
     const guideBox = document.getElementById('guide-box');
     const keyBox = document.getElementById('key-box');
-    const resetBtn = document.getElementById('reset-btn');
+    const resultArea = document.getElementById('result-area');
+    const copyBtn = document.getElementById('copy-btn');
     
     const rawCtx = rawCanvas.getContext('2d');
     const orthoCtx = orthoCanvas.getContext('2d');
@@ -143,8 +125,13 @@
             const URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
             await faceapi.nets.tinyFaceDetector.loadFromUri(URL);
             await faceapi.nets.faceLandmark68Net.loadFromUri(URL);
+            
             const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } 
+                video: { 
+                    facingMode: "user", 
+                    width: { ideal: 640, max: 640 }, 
+                    height: { ideal: 480, max: 480 } 
+                } 
             });
             video.srcObject = stream;
             video.onloadedmetadata = () => {
@@ -219,21 +206,21 @@
         orthoCtx.save();
         orthoCtx.translate(orthoCanvas.width/2, orthoCanvas.height/2);
         orthoCtx.strokeStyle = isForward ? 'var(--neon)' : '#333';
-        orthoCtx.strokeRect(-25, -35, 50, 70);
+        orthoCtx.strokeRect(-25, -30, 50, 60);
         corePoints.forEach(idx => {
             const p = pts[idx];
             const rx = (p.x - nose.x) * cosA - (p.y - nose.y) * sinA;
             const ry = (p.x - nose.x) * sinA + (p.y - nose.y) * cosA;
             orthoCtx.fillStyle = isForward ? 'var(--neon)' : '#333';
             orthoCtx.beginPath();
-            orthoCtx.arc(rx * scale * 0.5, ry * scale * 0.5, 1.5, 0, Math.PI*2);
+            orthoCtx.arc(rx * scale * 0.5, ry * scale * 0.5, 1.2, 0, Math.PI*2);
             orthoCtx.fill();
         });
         orthoCtx.restore();
     }
 
     async function autoCapture(landmarks) {
-        statusDisplay.innerText = "提取特征中...";
+        statusDisplay.innerText = "正在锁定特征...";
         statusDisplay.className = "status-box active";
         
         const pts = landmarks.positions;
@@ -268,6 +255,7 @@
         isProcessing = false;
         mask.style.display = 'none';
         guideBox.style.display = "none";
+        
         const counts = {};
         samples.forEach(s => counts[s] = (counts[s] || 0) + 1);
         const winner = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
@@ -277,8 +265,15 @@
         statusDisplay.innerText = "私钥生成成功";
         statusDisplay.className = "status-box locked";
         keyBox.innerText = hex;
-        keyBox.style.display = 'block';
-        resetBtn.style.display = 'block';
+        resultArea.style.display = 'flex';
+
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(hex).then(() => {
+                const originalText = copyBtn.innerText;
+                copyBtn.innerText = "已复制到剪贴板";
+                setTimeout(() => copyBtn.innerText = originalText, 2000);
+            });
+        };
     }
 
     init();
