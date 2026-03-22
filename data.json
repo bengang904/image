@@ -10,6 +10,12 @@
         "type": "编辑",
         "link": "web/2",
         "thumbnail": "web/2/logo.jpg"
+    },
+    {
+        "title": "人脸私钥生成",
+        "type": "识别",
+        "link": "web/3",
+        "thumbnail": "web/3/logo.jpg"
     }
 ]
 
